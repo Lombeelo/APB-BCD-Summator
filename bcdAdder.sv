@@ -1,5 +1,5 @@
 module bcdAdder #(
-    parameter argWidth = 32
+    parameter argWidth = 16
 ) (
     input clk,
     input resetn,
@@ -56,7 +56,7 @@ module bcdAdder #(
         digit1 = a[3:0];
         digit2 = b[3:0];
         result = result >> 4;
-        result[31:28] = digitRes;
+        result[argWidth-1:argWidth-4] = digitRes;
         p = p_out;
         overflow = p;
         p_in = p;

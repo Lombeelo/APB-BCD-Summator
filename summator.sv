@@ -1,7 +1,7 @@
 module summator #(
     parameter summatorBaseAddr = 0,
-    parameter addrWidth = 32,
-    parameter dataWidth = 32
+    parameter addrWidth = 10,
+    parameter dataWidth = 16
 ) (
     input aps_psel,
     input aps_penable,
@@ -21,6 +21,7 @@ module summator #(
   localparam STATE_READ = 3;
 
   localparam SUM_ARG_LEN = dataWidth / 8;
+  localparam MAX_ADDR = summatorBaseAddr + 2 ** addrWidth;
 
   localparam SUM_ARG1_ADDR = summatorBaseAddr;
   localparam SUM_ARG2_ADDR = SUM_ARG1_ADDR + SUM_ARG_LEN;
@@ -59,7 +60,7 @@ module summator #(
     end else begin
       execute_queried_flag = execute_queried_flag & executing_flag;
 
-      if (aps_paddr >= summatorBaseAddr && aps_paddr <= SUM_STATUS_ADDR) begin
+      if (aps_paddr >= summatorBaseAddr && aps_paddr <= MAX_ADDR) begin
         case (apb_state)
           STATE_IDLE: begin
             aps_prdata  <= 0;
@@ -79,33 +80,34 @@ module summator #(
           STATE_WRITE: begin
             aps_pready <= 1;
             if (aps_psel && aps_penable) begin
-              if (executing_flag & ~aps_pready) begin
+              if (executing_flag) begin
                 aps_pslverr <= 1;
               end else begin
-                if (aps_paddr >= SUM_ARG1_ADDR && aps_paddr < SUM_ARG2_ADDR) begin
-                  arg1 <= aps_pwdata;
-                end else if (aps_paddr >= SUM_ARG2_ADDR && aps_paddr < SUM_RES_ADDR) begin
-                  arg2 <= aps_pwdata;
-                end else if (aps_paddr == SUM_STATUS_ADDR) begin
-                  execute_queried_flag = aps_pwdata[0];
-                end
+                case (aps_paddr)
+                  SUM_ARG1_ADDR:   arg1 <= aps_pwdata;
+                  SUM_ARG2_ADDR:   arg2 <= aps_pwdata;
+                  SUM_STATUS_ADDR: execute_queried_flag = aps_pwdata[0];
+                endcase
               end
-            end else apb_state <= STATE_IDLE;
+            end
+            apb_state <= STATE_IDLE;
           end
           // READ
           STATE_READ: begin
             aps_pready <= 1;
             if (aps_psel && aps_penable) begin
-              if (executing_flag & ~aps_pready) begin
+              if (executing_flag) begin
                 aps_pslverr <= 1;
               end else begin
-                if (aps_paddr >= SUM_RES_ADDR && aps_paddr < SUM_STATUS_ADDR) begin
-                  aps_prdata <= result;
-                end else if (aps_paddr == SUM_STATUS_ADDR) begin
-                  aps_prdata <= overflow_flag;
-                end
+                case (aps_paddr)
+                  SUM_ARG1_ADDR: aps_prdata <= arg1;
+                  SUM_ARG2_ADDR: aps_prdata <= arg2;
+                  SUM_RES_ADDR: aps_prdata <= result;
+                  SUM_STATUS_ADDR: aps_prdata[0] <= overflow_flag;
+                endcase
               end
-            end else apb_state <= STATE_IDLE;
+            end
+            apb_state <= STATE_IDLE;
           end
           default: begin
             apb_state <= STATE_IDLE;
